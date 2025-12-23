@@ -1,12 +1,8 @@
 TARGET := FoxWIIterm
 BUILD := build
 SOURCES := source
-DATA := data
-INCLUDES :=
 
 CFLAGS := -O2 -Wall
-CXXFLAGS := $(CFLAGS)
-
-LIBS := -logc -lm
+LIBS := -logc -lwiiuse
 
 include $(DEVKITPPC)/wii_rules
