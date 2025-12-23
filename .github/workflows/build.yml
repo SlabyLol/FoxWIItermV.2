@@ -10,21 +10,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
+    - name: Checkout repository
       uses: actions/checkout@v4
 
     - name: Install prerequisites
       run: |
         sudo apt-get update
-        sudo apt-get install -y wget ca-certificates lsb-release xz-utils gnupg
+        sudo apt-get install -y curl ca-certificates lsb-release xz-utils gnupg
 
-    - name: Add devkitPro apt repo (securely)
+    - name: Add devkitPro apt GPG key (recommended location)
       run: |
-        # Save devkitPro GPG key to keyring (apt-key is deprecated)
-        sudo mkdir -p /usr/share/keyrings
-        sudo curl -fsSL https://apt.devkitpro.org/devkitpro.gpg -o /usr/share/keyrings/devkitpro-archive-keyring.gpg
-        # Register repository using signed-by
-        echo "deb [signed-by=/usr/share/keyrings/devkitpro-archive-keyring.gpg] https://apt.devkitpro.org/ubuntu $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/devkitpro.list
+        sudo mkdir -p /usr/local/share/keyrings
+        sudo curl -fsSL https://apt.devkitpro.org/devkitpro-pub.gpg -o /usr/local/share/keyrings/devkitpro-pub.gpg
+        ls -la /usr/local/share/keyrings/devkitpro-pub.gpg
+
+    - name: Add devkitPro apt repository (signed-by)
+      run: |
+        echo "deb [signed-by=/usr/local/share/keyrings/devkitpro-pub.gpg] https://apt.devkitpro.org stable main" | sudo tee /etc/apt/sources.list.d/devkitpro.list
         sudo apt-get update
 
     - name: Install devkitpro-pacman
@@ -38,20 +40,26 @@ jobs:
 
     - name: Show toolchain debug info
       run: |
-        echo "DEVKITPRO location: /opt/devkitpro"
+        echo "DEVKITPRO location (expected): /opt/devkitpro"
         ls -la /opt/devkitpro || true
         ls -la /opt/devkitpro/devkitPPC/bin || true
         /opt/devkitpro/devkitPPC/bin/powerpc-eabi-gcc --version || true
 
-    - name: Build (make)
-      env:
-        DEVKITPRO: /opt/devkitpro
+    - name: Set environment for build
       run: |
-        export DEVKITPRO=/opt/devkitpro
-        export PATH="$DEVKITPRO/devkitPPC/bin:$DEVKITPRO/tools/bin:$PATH"
-        echo "PATH=$PATH"
+        echo "DEVKITPRO=/opt/devkitpro" >> $GITHUB_ENV
+        echo "/opt/devkitpro/devkitPPC/bin" >> $GITHUB_PATH
+        echo "/opt/devkitpro/tools/bin" >> $GITHUB_PATH
+
+    - name: Debug files (optional)
+      run: |
         pwd
         ls -la
-        # falls Makefile/main.c in Unterordner sind, passe hier an (z.B. cd src)
+        find . -maxdepth 3 -type f -print
+
+    - name: Build (make)
+      run: |
+        # If your Makefile and sources are in a subfolder, change directory here, e.g.:
+        # cd path/to/project
         make
-      working-directory: .
+      # working-directory: ./path/to/project # <-- alternativ hier anpassen
