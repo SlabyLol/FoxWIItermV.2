@@ -13,36 +13,45 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Install prerequisites and add devkitPro apt repo
+    - name: Install prerequisites
       run: |
         sudo apt-get update
-        sudo apt-get install -y wget gnupg ca-certificates lsb-release xz-utils
-        # Add devkitPro apt key and repo
-        wget -qO- https://apt.devkitpro.org/devkitpro.gpg | sudo apt-key add -
-        echo "deb https://apt.devkitpro.org/ubuntu $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/devkitpro.list
+        sudo apt-get install -y wget ca-certificates lsb-release xz-utils gnupg
+
+    - name: Add devkitPro apt repo (securely)
+      run: |
+        # Save devkitPro GPG key to keyring (apt-key is deprecated)
+        sudo mkdir -p /usr/share/keyrings
+        sudo curl -fsSL https://apt.devkitpro.org/devkitpro.gpg -o /usr/share/keyrings/devkitpro-archive-keyring.gpg
+        # Register repository using signed-by
+        echo "deb [signed-by=/usr/share/keyrings/devkitpro-archive-keyring.gpg] https://apt.devkitpro.org/ubuntu $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/devkitpro.list
         sudo apt-get update
-        # Install the devkitpro package manager
+
+    - name: Install devkitpro-pacman
+      run: |
         sudo apt-get install -y devkitpro-pacman
 
     - name: Install devkitPPC and libogc with dkp-pacman
       run: |
-        # Update devkitpro package DB and install toolchain + libogc
         sudo dkp-pacman -Syu --noconfirm
         sudo dkp-pacman -S --noconfirm devkitPPC libogc
 
-    - name: Show installed toolchain (debug)
+    - name: Show toolchain debug info
       run: |
         echo "DEVKITPRO location: /opt/devkitpro"
         ls -la /opt/devkitpro || true
         ls -la /opt/devkitpro/devkitPPC/bin || true
-        which powerpc-eabi-gcc || true
+        /opt/devkitpro/devkitPPC/bin/powerpc-eabi-gcc --version || true
 
     - name: Build (make)
       env:
         DEVKITPRO: /opt/devkitpro
       run: |
-        # Ensure toolchain/tools are in PATH
+        export DEVKITPRO=/opt/devkitpro
         export PATH="$DEVKITPRO/devkitPPC/bin:$DEVKITPRO/tools/bin:$PATH"
         echo "PATH=$PATH"
+        pwd
+        ls -la
+        # falls Makefile/main.c in Unterordner sind, passe hier an (z.B. cd src)
         make
-      working-directory: .   # passe an, falls dein Makefile in Unterordner liegt
+      working-directory: .
