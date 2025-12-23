@@ -1,4 +1,4 @@
-name: Build Wii boot.dol
+name: Build Wii boot.dol (container)
 
 on:
   push:
@@ -8,54 +8,49 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkitppc:latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install prerequisites
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y curl ca-certificates lsb-release xz-utils
+      - name: Show toolchain (debug)
+        run: |
+          echo "DEVKITPRO expected at /opt/devkitpro"
+          ls -la /opt/devkitpro || true
+          ls -la /opt/devkitpro/devkitPPC/bin || true
+          /opt/devkitpro/devkitPPC/bin/powerpc-eabi-gcc --version || true
+          /opt/devkitpro/tools/bin/elf2dol --version || true
 
-    - name: Add devkitPro apt GPG key and repo
-      run: |
-        sudo mkdir -p /usr/local/share/keyrings
-        curl -fsSL https://apt.devkitpro.org/devkitpro-pub.gpg | sudo tee /usr/local/share/keyrings/devkitpro-pub.gpg > /dev/null
-        echo "deb [signed-by=/usr/local/share/keyrings/devkitpro-pub.gpg] https://apt.devkitpro.org stable main" | sudo tee /etc/apt/sources.list.d/devkitpro.list
-        sudo apt-get update
+      - name: Show libogc files (debug)
+        run: |
+          ls -la /opt/devkitpro/libogc || true
+          ls -la /opt/devkitpro/libogc/lib || true
+          ls -la /opt/devkitpro/libogc/lib/wii || true
+          find /opt/devkitpro -name 'libogc*.a' -o -name 'libpad*.a' -o -name 'libwiiuse*.a' -print || true
 
-    - name: Install devkitpro-pacman
-      run: |
-        sudo apt-get install -y devkitpro-pacman
+      - name: Set environment for build
+        run: |
+          echo "DEVKITPRO=/opt/devkitpro" >> $GITHUB_ENV
+          echo "/opt/devkitpro/devkitPPC/bin" >> $GITHUB_PATH
+          echo "/opt/devkitpro/tools/bin" >> $GITHUB_PATH
 
-    - name: Install devkitPPC, libogc and wiiuse (static)
-      run: |
-        sudo dkp-pacman -Syu --noconfirm
-        sudo dkp-pacman -S --noconfirm devkitPPC libogc libogc-static wiiuse wiiuse-static
+      - name: Debug repo files
+        run: |
+          pwd
+          ls -la
+          find . -maxdepth 3 -type f -print
 
-    - name: Show installed lib files (debug)
-      run: |
-        echo "Looking for libogc / libpad / wiiuse archives"
-        ls -la /opt/devkitpro/libogc || true
-        ls -la /opt/devkitpro/libogc/lib || true
-        ls -la /opt/devkitpro/libogc/lib/wii || true
-        find /opt/devkitpro -maxdepth 4 -name 'libogc*.a' -o -name 'libpad*.a' -o -name 'libwiiuse*.a' -print || true
+      - name: Build (make)
+        run: |
+          # Wenn Makefile/main.c in einem Unterordner liegen, passe working-directory an:
+          make
+        working-directory: .
 
-    - name: Set environment for build
-      run: |
-        echo "DEVKITPRO=/opt/devkitpro" >> $GITHUB_ENV
-        echo "/opt/devkitpro/devkitPPC/bin" >> $GITHUB_PATH
-        echo "/opt/devkitpro/tools/bin" >> $GITHUB_PATH
-
-    - name: Debug repo files
-      run: |
-        pwd
-        ls -la
-        find . -maxdepth 3 -type f -print
-
-    - name: Build (make)
-      run: |
-        # Falls Makefile/main.c in Subfolder: cd path/to/subfolder
-        make
-      working-directory: .
+      - name: Upload boot.dol artifact
+        if: success() && hashFiles('boot.dol') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-dol
+          path: boot.dol
