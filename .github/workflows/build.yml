@@ -10,22 +10,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
+    - name: Checkout
       uses: actions/checkout@v4
 
     - name: Install prerequisites
       run: |
         sudo apt-get update
-        sudo apt-get install -y curl ca-certificates lsb-release xz-utils gnupg
+        sudo apt-get install -y curl ca-certificates lsb-release xz-utils
 
-    - name: Add devkitPro apt GPG key (recommended location)
+    - name: Add devkitPro apt GPG key and repo
       run: |
         sudo mkdir -p /usr/local/share/keyrings
-        sudo curl -fsSL https://apt.devkitpro.org/devkitpro-pub.gpg -o /usr/local/share/keyrings/devkitpro-pub.gpg
-        ls -la /usr/local/share/keyrings/devkitpro-pub.gpg
-
-    - name: Add devkitPro apt repository (signed-by)
-      run: |
+        curl -fsSL https://apt.devkitpro.org/devkitpro-pub.gpg | sudo tee /usr/local/share/keyrings/devkitpro-pub.gpg > /dev/null
         echo "deb [signed-by=/usr/local/share/keyrings/devkitpro-pub.gpg] https://apt.devkitpro.org stable main" | sudo tee /etc/apt/sources.list.d/devkitpro.list
         sudo apt-get update
 
@@ -33,17 +29,18 @@ jobs:
       run: |
         sudo apt-get install -y devkitpro-pacman
 
-    - name: Install devkitPPC and libogc with dkp-pacman
+    - name: Install devkitPPC, libogc and wiiuse (static)
       run: |
         sudo dkp-pacman -Syu --noconfirm
-        sudo dkp-pacman -S --noconfirm devkitPPC libogc
+        sudo dkp-pacman -S --noconfirm devkitPPC libogc libogc-static wiiuse wiiuse-static
 
-    - name: Show toolchain debug info
+    - name: Show installed lib files (debug)
       run: |
-        echo "DEVKITPRO location (expected): /opt/devkitpro"
-        ls -la /opt/devkitpro || true
-        ls -la /opt/devkitpro/devkitPPC/bin || true
-        /opt/devkitpro/devkitPPC/bin/powerpc-eabi-gcc --version || true
+        echo "Looking for libogc / libpad / wiiuse archives"
+        ls -la /opt/devkitpro/libogc || true
+        ls -la /opt/devkitpro/libogc/lib || true
+        ls -la /opt/devkitpro/libogc/lib/wii || true
+        find /opt/devkitpro -maxdepth 4 -name 'libogc*.a' -o -name 'libpad*.a' -o -name 'libwiiuse*.a' -print || true
 
     - name: Set environment for build
       run: |
@@ -51,7 +48,7 @@ jobs:
         echo "/opt/devkitpro/devkitPPC/bin" >> $GITHUB_PATH
         echo "/opt/devkitpro/tools/bin" >> $GITHUB_PATH
 
-    - name: Debug files (optional)
+    - name: Debug repo files
       run: |
         pwd
         ls -la
@@ -59,7 +56,6 @@ jobs:
 
     - name: Build (make)
       run: |
-        # If your Makefile and sources are in a subfolder, change directory here, e.g.:
-        # cd path/to/project
+        # Falls Makefile/main.c in Subfolder: cd path/to/subfolder
         make
-      # working-directory: ./path/to/project # <-- alternativ hier anpassen
+      working-directory: .
